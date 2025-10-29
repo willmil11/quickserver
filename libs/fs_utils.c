@@ -84,6 +84,15 @@ bool file_append(const char* path, const char* content) {
     }
 }
 
+ssize_t file_size(const char *path) {
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        return (ssize_t)st.st_size;
+    } else {
+        return -1;
+    }
+}
+
 char* file_read(const char* path) {
     FILE* f = fopen(path, "r");
     if (f == NULL) {
