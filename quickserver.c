@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "libs/cJSON.h"
 #include "libs/cJSON.c"
@@ -27,7 +28,8 @@ static char* g_tls_key_data = NULL;
 typedef struct {
     char ip[40];
     bool ip_type; //true is ipv4 false is ipv6
-    char method[8];
+    char method[16];
+    char* url; //request target including query string
     char* body; //if any else NULL
     char* headers;
 } reqData;
@@ -35,51 +37,630 @@ typedef struct {
 typedef struct {
     char* resp_data;
     int http_code;
-    char* resp_headers;
+    char resp_headers[256];
+    bool free_authorized;
 } reqResp;
 
+char* default_404_page = "<!DOCTYPE html>\n<html>\n    <head>\n        <title>404 – Page not found</title>\n    </head>\n    <body>\n        <iframe id=\"homepage\"></iframe>\n        <div id=\"container\">\n            <center>\n                <h1 id=\"header\">404 – Page not found</h1>\n                <button id=\"button\">Go to homepage</button>\n            </center>\n        </div>\n    </body>\n</html>\n<script>\n    ;(function(){\n        var container = document.getElementById(\"container\");\n        var header = document.getElementById(\"header\");\n        var button = document.getElementById(\"button\");\n        var homepage = document.getElementById(\"homepage\");\n\n        var original_homepage_dsp = homepage.style.display;\n        homepage.style.display = \"none\";\n        \n        var homepage_loaded = false;\n        homepage.onload = function(){\n            homepage_loaded = true;\n        }\n\n        document.body.style.backgroundColor = \"#f0eee6\";\n        document.body.style.margin = \"0px\";\n\n        document.body.style.userSelect = \"none\";\n        document.body.style.webkitUserSelect = \"none\";\n        document.body.style.mozUserSelect = \"none\";\n        document.body.style.msUserSelect = \"none\";\n\n        container.style.backgroundColor = \"#e3dacc\";\n        container.style.position = \"absolute\";\n        \n        header.style.fontFamily = \"Arial\";\n        button.style.backgroundColor = \"rgb(40,40,40)\";\n        button.style.color = \"rgb(255,255,255)\";\n        button.style.fontFamily = \"Arial\";\n        button.style.border = \"0px\"\n\n        button.onmouseover = function(){\n            button.style.backgroundColor = \"#bcb6ff\";\n            button.style.color = \"rgb(0,0,0)\";\n        }\n        button.onmouseout = function(){\n            button.style.backgroundColor = \"rgb(40,40,40)\";\n            button.style.color = \"rgb(255,255,255)\";\n        }\n\n        window.onresize = function(){\n            var sizeFactor = window.innerWidth * window.innerHeight / 10000;\n\n            header.style.fontSize = sizeFactor / 2 + \"px\";\n            container.style.borderRadius = sizeFactor / 16 + \"px\";\n\n            try{\n                button.style.fontSize = sizeFactor / 3 + \"px\";\n                button.style.borderRadius = sizeFactor / 16 + \"px\";\n            }\n            catch (error){}\n\n            container.style.padding = sizeFactor / 16 + \"px\"\n\n            container.style.marginLeft = window.innerWidth / 2 - container.offsetWidth / 2 + \"px\";\n            container.style.marginTop = window.innerHeight / 2 - container.offsetHeight / 2 + \"px\";\n        }\n        window.onresize();\n\n        var wait = async function(ms){\n            return new Promise(function(resolve, reject){\n                setTimeout(resolve, ms);\n            })\n        }\n\n        button.onclick = async function(){\n            homepage.src = \"/\"\n\n            button.remove();\n            header.innerHTML = \"Loading...\";\n\n            window.onresize();\n\n            while (!homepage_loaded){\n                await wait(10); //wait till page is loaded.\n            }\n\n            homepage.style.display = original_homepage_dsp;\n\n            homepage.style.border = \"0px\";\n            homepage.style.position = \"absolute\";\n            container.remove();\n            window.onresize = function(){\n                homepage.style.width = window.innerWidth + \"px\";\n                homepage.style.height = window.innerHeight + \"px\";\n            }\n            window.onresize();\n        }\n    })();\n</script>\n\n";
+
+char* serve_path = NULL;
+char* log_path = NULL;
+
+char *exts_to_mime[][2] = {
+    {"7z", "application/x-7z-compressed"},
+    {"aac", "audio/aac"},
+    {"abw", "application/x-abiword"},
+    {"ai", "application/postscript"},
+    {"apk", "application/vnd.android.package-archive"},
+    {"appimage", "application/x-iso9660-appimage"},
+    {"avi", "video/x-msvideo"},
+    {"avif", "image/avif"},
+    {"azw", "application/vnd.amazon.ebook"},
+    {"bak", "application/octet-stream"},
+    {"bat", "application/x-msdownload"},
+    {"bin", "application/octet-stream"},
+    {"bmp", "image/bmp"},
+    {"bz", "application/x-bzip"},
+    {"bz2", "application/x-bzip2"},
+    {"c", "text/x-c"},
+    {"cab", "application/vnd.ms-cab-compressed"},
+    {"cbr", "application/x-cbr"},
+    {"cbz", "application/x-cbz"},
+    {"cc", "text/x-c"},
+    {"cfg", "text/plain"},
+    {"cgi", "application/x-httpd-cgi"},
+    {"class", "application/java-vm"},
+    {"clj", "text/x-clojure"},
+    {"conf", "text/plain"},
+    {"cpp", "text/x-c"},
+    {"cs", "text/x-csharp"},
+    {"css", "text/css"},
+    {"csv", "text/csv"},
+    {"cxx", "text/x-c"},
+    {"deb", "application/vnd.debian.binary-package"},
+    {"dll", "application/x-msdownload"},
+    {"dmg", "application/x-apple-diskimage"},
+    {"doc", "application/msword"},
+    {"docm", "application/vnd.ms-word.document.macroenabled.12"},
+    {"docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    {"dot", "application/msword"},
+    {"dotx", "application/vnd.openxmlformats-officedocument.wordprocessingml.template"},
+    {"ejs", "application/javascript"},
+    {"elf", "application/x-elf"},
+    {"eml", "message/rfc822"},
+    {"eot", "application/vnd.ms-fontobject"},
+    {"epub", "application/epub+zip"},
+    {"exe", "application/vnd.microsoft.portable-executable"},
+    {"flac", "audio/flac"},
+    {"flv", "video/x-flv"},
+    {"gif", "image/gif"},
+    {"go", "text/plain"},
+    {"gz", "application/gzip"},
+    {"h", "text/x-c"},
+    {"hpp", "text/x-c"},
+    {"htm", "text/html"},
+    {"html", "text/html"},
+    {"ico", "image/x-icon"},
+    {"ini", "text/plain"},
+    {"iso", "application/x-iso9660-image"},
+    {"jar", "application/java-archive"},
+    {"jpeg", "image/jpeg"},
+    {"jpg", "image/jpeg"},
+    {"js", "application/javascript"},
+    {"json", "application/json"},
+    {"jsonld", "application/ld+json"},
+    {"key", "application/x-iwork-keynote-sffkey"},
+    {"kt", "text/x-kotlin"},
+    {"kts", "text/x-kotlin"},
+    {"lha", "application/x-lzh-compressed"},
+    {"log", "text/plain"},
+    {"lua", "text/x-lua"},
+    {"m3u", "audio/x-mpegurl"},
+    {"m4a", "audio/mp4"},
+    {"m4v", "video/mp4"},
+    {"md", "text/markdown"},
+    {"mdb", "application/x-msaccess"},
+    {"mid", "audio/midi"},
+    {"midi", "audio/midi"},
+    {"mjs", "application/javascript"},
+    {"mkv", "video/x-matroska"},
+    {"mov", "video/quicktime"},
+    {"mp2", "audio/mpeg"},
+    {"mp3", "audio/mpeg"},
+    {"mp4", "video/mp4"},
+    {"mpeg", "video/mpeg"},
+    {"mpg", "video/mpeg"},
+    {"msi", "application/x-msdownload"},
+    {"odp", "application/vnd.oasis.opendocument.presentation"},
+    {"ods", "application/vnd.oasis.opendocument.spreadsheet"},
+    {"odt", "application/vnd.oasis.opendocument.text"},
+    {"oga", "audio/ogg"},
+    {"ogg", "audio/ogg"},
+    {"ogv", "video/ogg"},
+    {"otf", "font/otf"},
+    {"pdf", "application/pdf"},
+    {"php", "application/x-httpd-php"},
+    {"pkg", "application/octet-stream"},
+    {"pl", "application/x-perl"},
+    {"png", "image/png"},
+    {"ppt", "application/vnd.ms-powerpoint"},
+    {"pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    {"ps", "application/postscript"},
+    {"psd", "image/vnd.adobe.photoshop"},
+    {"py", "text/x-python"},
+    {"rar", "application/vnd.rar"},
+    {"rb", "text/x-ruby"},
+    {"rpm", "application/x-rpm"},
+    {"rs", "text/plain"},
+    {"rtf", "application/rtf"},
+    {"sass", "text/x-sass"},
+    {"scss", "text/x-scss"},
+    {"sh", "application/x-sh"},
+    {"sql", "application/sql"},
+    {"svg", "image/svg+xml"},
+    {"svgz", "image/svg+xml"},
+    {"swf", "application/x-shockwave-flash"},
+    {"tar", "application/x-tar"},
+    {"tbz", "application/x-bzip-compressed-tar"},
+    {"tbz2", "application/x-bzip-compressed-tar"},
+    {"tif", "image/tiff"},
+    {"tiff", "image/tiff"},
+    {"toml", "application/toml"},
+    {"ts", "video/mp2t"},
+    {"tsv", "text/tab-separated-values"},
+    {"ttf", "font/ttf"},
+    {"txt", "text/plain"},
+    {"wav", "audio/wav"},
+    {"weba", "audio/webm"},
+    {"webm", "video/webm"},
+    {"webp", "image/webp"},
+    {"whl", "application/zip"},
+    {"woff", "font/woff"},
+    {"woff2", "font/woff2"},
+    {"xls", "application/vnd.ms-excel"},
+    {"xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    {"xml", "application/xml"},
+    {"xpi", "application/x-xpinstall"},
+    {"xz", "application/x-xz"},
+    {"yaml", "application/x-yaml"},
+    {"yml", "application/x-yaml"},
+    {"zip", "application/zip"},
+    {"zst", "application/zstd"},
+    {NULL, NULL}
+};
+
+char* get_mime_for_ext(char *ext) {
+    int low = 0;
+    int high = 0;
+    while (exts_to_mime[high][0] != NULL) {
+        high++;
+    }
+    high--;
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        int cmp = strcmp(ext, exts_to_mime[mid][0]);
+        if (cmp == 0) {
+            return exts_to_mime[mid][1];
+        } else if (cmp < 0) {
+            high = mid - 1;
+        } else {
+            low = mid + 1;
+        }
+    }
+    return "application/octet-stream";
+}
+
+char** processids = NULL;
+int processids_len = 0;
+
+int cmpstr(const void *a, const void *b) {
+    char* const *sa = a;
+    char* const *sb = b;
+    return strcmp(*sa, *sb);
+}
+
+void sort_processids(){
+    if (processids == NULL){
+        return;
+    }
+    qsort(processids, processids_len, sizeof(char *), cmpstr);
+    return;
+}
+
+int index_of_processid(char *target) {
+    int low = 0;
+    int high = processids_len - 1;
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        int cmp = strcmp(processids[mid], target);
+        if (cmp == 0) {
+            return mid;
+        } else {
+            if (cmp < 0) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+    }
+    return -1;
+}
+
+char* newProcessID(){
+    char processid[6] = {0};
+    while (true){
+        for (int index = 0; index < 5; index++){
+            processid[index] = '0' + (rand() % 10);
+        }
+
+        if (index_of_processid(processid) == -1){
+            processids_len++;
+            char** tmp = realloc(processids, processids_len * sizeof(char*));
+            if (!tmp){
+                printf("[Quickserver] Failed to allocate memory to generate new proceessid.\n");
+                return NULL;
+            }
+            processids = tmp;
+            processids[processids_len - 1] = malloc(6);
+            if (!processids[processids_len - 1]){
+                printf("[Quickserver] Failed to allocate memory to generate new processid.\n");
+                processids_len--;
+                //no need for tmp as scale down cannot ever fail.
+                processids = realloc(processids, processids_len * sizeof(char*));
+                return NULL;
+            }
+            strcpy(processids[processids_len - 1], processid);
+            sort_processids();
+            return processids[index_of_processid(processid)];
+        }
+    }
+}
+
+bool freeProcessId(char* processid){
+    int indexOfProcessid = index_of_processid(processid);
+    if (indexOfProcessid == -1){
+        return false;
+    }
+    char** newprocessids = malloc((processids_len - 1) * sizeof(char*));
+    if (!newprocessids){
+        printf("[Quickserver] Failed to allocate memory to free processid.\n");
+        return false;
+    }
+
+    bool offset = false;
+    for (int index = 0; index < processids_len; index++){
+        if (index == indexOfProcessid){
+            free(processids[index]);
+            offset = true;
+            continue;
+        }
+        if (offset){
+            newprocessids[index - 1] = processids[index];
+        }
+        else{
+            newprocessids[index] = processids[index];
+        }
+    }
+
+    processids_len--;
+    free(processids);
+    processids = newprocessids;
+
+    sort_processids();
+
+    return true;
+}
+
+void get_time_string(char* buf) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);  // seconds + microseconds
+
+    struct tm* tm_info = localtime(&tv.tv_sec);
+
+    int millis = tv.tv_usec / 1000;
+
+    sprintf(buf, "%02d-%02d-%04d_%02d:%02d:%02d:%03d",
+             tm_info->tm_mon + 1,
+             tm_info->tm_mday,
+             tm_info->tm_year + 1900,
+             tm_info->tm_hour,
+             tm_info->tm_min,
+             tm_info->tm_sec,
+             millis);
+}
+
+#ifdef log
+#undef log
+#endif
+
+#define log put_to_log
+bool put_to_log(reqData log_data, reqResp resp, char* processid){
+    printf("[Quickserver] [%s] Generating log...\n", processid);
+    char time[32] = {0};
+    get_time_string(time);
+
+    char log_name[32] = {0};
+    sprintf(log_name, "%s.json", time);
+
+    cJSON* log = cJSON_CreateObject();
+    if (!log){
+        printf("[Quickserver] [%s] Failed to generate log.\n", processid);
+        return false;
+    }
+    cJSON_AddStringToObject(log, "client_ip", log_data.ip);
+    cJSON_AddStringToObject(log, "request_method", log_data.method);
+    cJSON_AddStringToObject(log, "request_url", log_data.url);
+    if (log_data.body){
+        cJSON_AddStringToObject(log, "request_body", log_data.body);
+    }
+    else{
+        cJSON_AddStringToObject(log, "request_body", "");
+    }
+    if (log_data.headers){
+        cJSON_AddStringToObject(log, "request_headers", log_data.headers);
+    }
+    else{
+        cJSON_AddStringToObject(log, "request_headers", "");
+    }
+    cJSON_AddNumberToObject(log, "response_http_code", resp.http_code);
+    cJSON_AddStringToObject(log, "response_headers", resp.resp_headers);
+
+    char* log_str = cJSON_PrintUnformatted(log);
+    if (!log_str){
+        printf("[Quickserver] [%s] Failed to generate log.\n", processid);
+        cJSON_Delete(log);
+        return false;
+    }
+    cJSON_Delete(log);
+    printf("[Quickserver] [%s] Generated log.\n", processid);
+
+    int log_path_len = strlen(log_path);
+    char log_path_no_leading_slash[log_path_len + 2];
+    strcpy(log_path_no_leading_slash, log_path);
+    if (log_path_no_leading_slash[log_path_len - 1] == '/'){
+        log_path_no_leading_slash[log_path_len - 1] = '\0';
+    }
+    char log_write_path[strlen(log_path_no_leading_slash) + 32];
+    sprintf(log_write_path, "%s/%s", log_path_no_leading_slash, log_name);
+
+    printf("[Quickserver] [%s] Writing log '%s'...\n", processid, log_name);
+    bool log_write_success = file_write(log_write_path, log_str);
+    free(log_str);
+    if (!log_write_success){
+        printf("[Quickserver] [%s] Failed to write log '%s'.\n", processid, log_name);
+        return false;
+    }
+    printf("[Quickserver] [%s] Wrote log '%s'.\n", processid, log_name);
+    return true;
+}
+
 reqResp handle_request(reqData req){
-    printf("Received request, data:\n");
-    printf("ip: %s\n", req.ip);
-    printf("ip_type: %s\n", req.ip_type ? "ipv4" : "ipv6");
-    printf("method: %s\n", req.method);
-    if (req.body){
-        printf("body: %s\n", req.body);
+    reqResp resp = {0};
+    printf("[Quickserver] New request received, generating processid...\n");
+    char* processid = newProcessID();
+    if (!processid){
+        printf("[Quickserver] Failed to generate processid.\n");
+        //freeProcessid will refuse the processid placeholder as it cannot be in the list
+        //it is therefore safe
+        processid = "no_processid";
+    }
+    printf("[Quickserver] [%s] Processid generated.\n", processid);
+    printf("[Quickserver] [%s] Client's ip is of type %s and is %s.\n", processid, req.ip_type ? "ipv4" : "ipv6", req.ip);
+    printf("[Quickserver] [%s] Request url is '%s'.\n", processid, req.url);
+    printf("[Quickserver] [%s] Request method is '%s'.\n", processid, req.method);
+
+    if (strcmp(req.method, "GET") != 0){
+        printf("[Quickserver] [%s] Request method is not GET but '%s', sending 405 (method not allowed) error...\n", processid, req.method);
+        resp.http_code = 405;
+        resp.free_authorized = false;
+        resp.resp_data = "Method not allowed (use GET).";
+        sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+        printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+        log(req, resp, processid);
+        freeProcessId(processid);
+        return resp;
+    }
+
+    //Resolve path
+    int serve_path_len = strlen(serve_path);
+    char serve_path_no_leading_slash[serve_path_len + 1];
+    strcpy(serve_path_no_leading_slash, serve_path);
+    if (serve_path_no_leading_slash[serve_path_len - 1] == '/'){
+        serve_path_no_leading_slash[serve_path_len - 1] = '\0';
+    }
+
+    //Url can be quite big so we will do heap alloc
+    char* full_path = malloc(serve_path_len + strlen(req.url) + 1);
+    if (!full_path){
+        printf("[Quickserver] [%s] Failed to allocate memory to resolve what the url points to.\n", processid);
+        printf("[Quickserver] [%s] Sending 500 (internal server error)...\n", processid);
+        resp.http_code = 500;
+        resp.free_authorized = false;
+        resp.resp_data = "Internal server error.";
+        sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+        printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+        log(req, resp, processid);
+        freeProcessId(processid);
+        return resp;
+    }
+    
+    sprintf(full_path, "%s%s", serve_path_no_leading_slash, req.url); //url starts with /
+
+    bool resolve_type; //false is directory, true is file
+    bool is_dir_ = is_dir(full_path);
+    bool is_file_ = is_file(full_path);
+    if ((!is_dir_) && (!is_file_)){
+        printf("[Quickserver] [%s] Request url does not point to a valid file/directory, sending 404 (Not Found)...\n", processid);
+        //404 case.
+        //Attempt to fetch 404.html
+        //Path can be allocated on stack as there is no url.
+        printf("[Quickserver] [%s] Attempting to read custom user 404.html (if it exists)...\n", processid);
+        char full_path_404[serve_path_len + strlen("/404.html") + 1];
+        sprintf(full_path_404, "%s/404.html", serve_path_no_leading_slash);
+        char* user_404_page = file_read(full_path_404);
+        ssize_t user_404_page_size = file_size(full_path_404);
+        if ((!user_404_page) || (user_404_page_size == -1)){
+            printf("[Quickserver] [%s] Custom user 404.html does not exist or is unreadable, using default embedded 404.html page...\n", processid);
+            resp.http_code = 404;
+            resp.free_authorized = false;
+            resp.resp_data = default_404_page;
+            sprintf(resp.resp_headers, "Content-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(default_404_page));
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            free(full_path);
+            return resp;
+        }
+        else{
+            printf("[Quickserver] [%s] Custom user 404.html exists and is readable, using it...\n", processid);
+            resp.http_code = 404;
+            resp.free_authorized = true;
+            resp.resp_data = user_404_page;
+            sprintf(resp.resp_headers, "Content-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\nConnection: close", user_404_page_size);
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            free(full_path);
+            return resp;
+        }
     }
     else{
-        printf("body: no body\n");
+        resolve_type = is_file_;
     }
-    if (req.headers){
-        printf("headers: %s\n", req.headers);
+
+    if (resolve_type){
+        //if file
+        printf("[Quickserver] [%s] Request url points to a valid file, reading it...\n", processid);
+        char* file = file_read(full_path);
+        ssize_t file_size_ = file_size(full_path);
+        if ((!file) || (file_size_ == -1)){
+            printf("[Quickserver] [%s] Failed to read file, sending 500 (internal server error)...\n", processid);
+            resp.http_code = 500;
+            resp.free_authorized = false;
+            resp.resp_data = "Internal server error.";
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            free(full_path);
+            return resp;
+        }
+        printf("[Quickserver] [%s] Read file. (%zu bytes)\n", processid, file_size_);
+        printf("[Quickserver] [%s] Identifying file extension...\n", processid);
+        char* ext = full_path;
+        while ((strstr(ext, "/") != NULL) || (strstr(ext, "\\") != NULL)){
+            ext += 1;
+        }
+        int ext_len = strlen(ext);
+        int dot_index = -1;
+        for (int index = 0; index < ext_len; index++){
+            if (ext[index] == '.'){
+                dot_index = index;
+                break;
+            }
+            dot_index++;
+        }
+        ext += dot_index; //Now ext is either en empty string or the extension of the file
+        printf("[Quickserver] [%s] File extension: '%s'.\n", processid, ext);
+        printf("[Quickserver] [%s] Guessing MIME type...\n", processid);
+
+        char* mime = get_mime_for_ext(ext);
+
+        printf("[Quickserver] [%s] MIME type: '%s'\n", processid, mime);
+        printf("[Quickserver] [%s] Responding with file, guessed MIME type, and http code 200 (OK)...\n", processid);
+        resp.http_code = 200;
+        resp.free_authorized = true;
+        resp.resp_data = file;
+        sprintf(resp.resp_headers, "Content-Type: %s; charset=utf-8\r\nContent-Length: %zu\r\nConnection: close", mime, file_size_);
+        printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+        log(req, resp, processid);
+        freeProcessId(processid);
+        free(full_path);
+        return resp;
     }
     else{
-        printf("headers: no headers\n");
-    }
+        //If directory
+        //we wanna remove the leading slash from full_path if there is one to do the manipulation
+        printf("[Quickserver] [%s] Request url points to a directory, checking if it contains an 'index.html' file...\n", processid);
+        int full_path_len = strlen(full_path);
+        if (full_path[full_path_len - 1] == '/'){
+            full_path[full_path_len - 1] = '\0';
+        }
 
-    printf("Constructing resp and sending\n");
-    reqResp resp;
-    resp.http_code = 200;
-    resp.resp_data = NULL;
-    resp.resp_headers = NULL;
-    char* resp_data = malloc(strlen("Hello, world!") + 1);
-    if (!resp_data){
-        printf("Failed to allocate memory for test.\n");
-        exit(1);
-    }
-    strcpy(resp_data, "Hello, world!");
-    resp.resp_data = resp_data;
+        //Heap alloc cuz full_path contains url which can be quite fat.
+        char* full_path_resolved = malloc(full_path_len + strlen("/index.html") + 1);
+        if (!full_path_resolved){
+            printf("[Quickserver] [%s] Failed to allocate memory to resolve what the url points to.\n", processid);
+            printf("[Quickserver] [%s] Sending 500 (internal server error)...\n", processid);
+            resp.http_code = 500;
+            resp.free_authorized = false;
+            resp.resp_data = "Internal server error.";
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            free(full_path);
+            return resp;
+        }
+        sprintf(full_path_resolved, "%s/index.html", full_path);
+        if (is_file(full_path_resolved)){
+            printf("[Quickserver] [%s] The directory the request url points to contains an 'index.html' file, reading it...\n", processid);
+            char* file = file_read(full_path_resolved);
+            ssize_t file_size_ = file_size(full_path_resolved);
 
-    const char* header_value = "Content-Type: text/plain\r\n";
-    char* resp_headers = malloc(strlen(header_value) + 1);
-    if (!resp_headers){
-        printf("Failed to allocate memory for response headers.\n");
-        free(resp_data);
-        exit(1);
-    }
-    strcpy(resp_headers, header_value);
-    resp.resp_headers = resp_headers;
+            if ((!file) || (file_size_ == -1)){
+                printf("[Quickserver] [%s] Failed to read file, sending 500 (internal server error)...\n", processid);
+                resp.http_code = 500;
+                resp.free_authorized = false;
+                resp.resp_data = "Internal server error.";
+                sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+                printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+                log(req, resp, processid);
+                freeProcessId(processid);
+                free(full_path);
+                return resp;
+            }
 
-    return resp;
+            printf("[Quickserver] [%s] Read file. (%zu bytes)\n", processid, file_size_);
+            printf("[Quickserver] [%s] Responding with file, and http code 200 (OK)...\n", processid);
+            resp.http_code = 200;
+            resp.free_authorized = true;
+            resp.resp_data = file;
+            sprintf(resp.resp_headers, "Content-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\nConnection: close", file_size_);
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            return resp;
+        }
+        else{
+            printf("[Quickserver] [%s] The directory the request url points to does not contain an 'index.html' file, generating list of directory items...\n", processid);
+            char** directory_list = dir_list(full_path);
+            if (!directory_list){
+                printf("[Quickserver] [%s] Failed to list directory, sending 500 (internal server error)...\n", processid);
+                resp.http_code = 500;
+                resp.free_authorized = false;
+                resp.resp_data = "Internal server error.";
+                sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+                printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+                log(req, resp, processid);
+                freeProcessId(processid);
+                free(full_path);
+                return resp;
+            }
+            printf("[Quickserver] [%s] Listed directory, generating response...\n", processid);
+            size_t directory_list_response_len = strlen("List of items in :\n") + strlen(req.url) + 1;
+            char* directory_list_response = malloc(directory_list_response_len);
+            if (!directory_list_response){
+                printf("[Quickserver] [%s] Failed to allocate memory to generate response, sending 500 (internal server error)...\n", processid);
+                resp.http_code = 500;
+                resp.free_authorized = false;
+                resp.resp_data = "Internal server error.";
+                sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+                printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+                log(req, resp, processid);
+                freeProcessId(processid);
+                free(full_path);
+                dir_list_free(directory_list);
+                return resp;
+            }
+            sprintf(directory_list_response, "List of items in %s:\n", req.url);
+            
+            for (int index = 0; directory_list[index] != NULL; index++){
+                directory_list_response_len = directory_list_response_len + strlen("  - \n") + strlen(directory_list[index]);
+                char* tmp = realloc(directory_list_response, directory_list_response_len);
+                if (!directory_list_response){
+                    printf("[Quickserver] [%s] Failed to allocate memory to generate response, sending 500 (internal server error)...\n", processid);
+                    resp.http_code = 500;
+                    resp.free_authorized = false;
+                    resp.resp_data = "Internal server error.";
+                    sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+                    printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+                    log(req, resp, processid);
+                    freeProcessId(processid);
+                    free(directory_list_response);
+                    dir_list_free(directory_list);
+                    free(full_path);
+                    return resp;
+                }
+                directory_list_response = tmp;
+                char itemConstruct[strlen("  - \n") + strlen(directory_list[index]) + 1];
+                sprintf(itemConstruct, "  - %s\n", directory_list[index]);
+                strcat(directory_list_response, itemConstruct);
+            }
+
+            directory_list_response[directory_list_response_len - 2] = '\0'; //remove last newline
+
+            printf("[Quickserver] [%s] Generated response, responding with it, and http code 200 (OK).\n", processid);
+            resp.http_code = 200;
+            resp.free_authorized = true;
+            resp.resp_data = directory_list_response;
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", directory_list_response_len - 1);
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            return resp;
+        }
+    }
 }
 
 static void addr_to_str(const struct mg_addr *addr, char *buf, size_t len) {
@@ -123,10 +704,33 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
         memcpy(rd.method, hm->method.buf, mlen);
         rd.method[mlen] = '\0';
 
+        // URL (uri + optional query)
+        size_t url_len = hm->uri.len;
+        if (hm->query.len > 0) {
+            url_len += 1 + hm->query.len;
+        }
+        rd.url = (char*) malloc(url_len + 1);
+        if (rd.url == NULL) {
+            mg_http_reply(c, 500, "", "Internal Server Error");
+            return;
+        }
+        char *url_ptr = rd.url;
+        if (hm->uri.len > 0) {
+            memcpy(url_ptr, hm->uri.buf, hm->uri.len);
+            url_ptr += hm->uri.len;
+        }
+        if (hm->query.len > 0) {
+            *url_ptr++ = '?';
+            memcpy(url_ptr, hm->query.buf, hm->query.len);
+            url_ptr += hm->query.len;
+        }
+        *url_ptr = '\0';
+
         // Body (malloc + NUL)
         if (hm->body.len > 0) {
             rd.body = (char*) malloc(hm->body.len + 1);
             if (rd.body == NULL) {
+                if (rd.url) free(rd.url);
                 mg_http_reply(c, 500, "", "Internal Server Error");
                 return;
             }
@@ -144,6 +748,7 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
         rd.headers = (char*) malloc(total_hlen + 1);
         if (rd.headers == NULL) {
             if (rd.body) free(rd.body);
+            if (rd.url) free(rd.url);
             mg_http_reply(c, 500, "", "Internal Server Error");
             return;
         }
@@ -172,12 +777,15 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
         mg_http_reply(c, code, resp_headers, "%s", resp_body);
 
         // Cleanup
+        if (rd.url) free(rd.url);
         if (rd.body) free(rd.body);
         if (rd.headers) free(rd.headers);
+        if (rr.resp_data && rr.free_authorized) free(rr.resp_data);
     }
 }
 
 int main(int argc, char** argv){
+    srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
             printf("[Quickserver] [Help] Hello, this is a simple guide on how to use this software:\n");
@@ -252,11 +860,14 @@ int main(int argc, char** argv){
             cJSON* request_headers = cJSON_GetObjectItem(log, "request_headers");
             cJSON* request_body = cJSON_GetObjectItem(log, "request_body");
             cJSON* request_method = cJSON_GetObjectItem(log, "request_method");
-            if ((client_ip == NULL) || (request_url == NULL) || (request_headers == NULL) || (request_body == NULL) || (request_method == NULL)){
+            cJSON* response_http_code = cJSON_GetObjectItem(log, "response_http_code");
+            cJSON* response_headers = cJSON_GetObjectItem(log, "response_headers");
+
+            if ((client_ip == NULL) || (request_url == NULL) || (request_headers == NULL) || (request_body == NULL) || (request_method == NULL) || (response_http_code == NULL) || (response_headers == NULL)){
                 corrupt_log();
             }
 
-            if ((!cJSON_IsString(client_ip)) || (!cJSON_IsString(request_url)) || (!cJSON_IsString(request_headers)) || (!cJSON_IsString(request_body)) || (!cJSON_IsString(request_method))){
+            if ((!cJSON_IsString(client_ip)) || (!cJSON_IsString(request_url)) || (!cJSON_IsString(request_headers)) || (!cJSON_IsString(request_body)) || (!cJSON_IsString(request_method)) || (!(cJSON_IsNumber(response_http_code)) || (!(cJSON_IsString(response_headers))))){
                 corrupt_log();
             }
 
@@ -265,8 +876,10 @@ int main(int argc, char** argv){
             char* request_headers_dat = strdup(request_headers->valuestring);
             char* request_body_dat = strdup(request_body->valuestring);
             char* request_method_dat = strdup(request_method->valuestring);
+            int response_http_code_dat = response_http_code->valueint;
+            char* response_headers_dat = strdup(response_headers->valuestring);
 
-            if ((!client_ip_dat) || (!request_url_dat) || (!request_headers_dat) || (!request_body_dat) || (!request_method_dat)){
+            if ((!client_ip_dat) || (!request_url_dat) || (!request_headers_dat) || (!request_body_dat) || (!request_method_dat) || (!response_headers_dat)){
                 printf("[Quickserver] Failed to allocate memory to analyse log.\n");
                 return 1;
             }
@@ -478,6 +1091,9 @@ int main(int argc, char** argv){
             printf("  - Request method: '%s'\n", request_method_dat);
             printf("  - Request headers: '%s'\n", request_headers_dat);
             printf("  - Request body: '%s'\n", request_body_dat);
+            printf("Response data:\n");
+            printf("  - Response's http code: %d\n", response_http_code_dat);
+            printf("  - Response's headers: '%s'\n", response_headers_dat);
             return 0;
         }
         else{
@@ -560,6 +1176,9 @@ int main(int argc, char** argv){
         }
     }
 
+    serve_path = args[0];
+    log_path = args[1];
+
     struct mg_mgr mgr;
     mg_log_set(MG_LL_NONE);
     mg_mgr_init(&mgr);
@@ -609,7 +1228,7 @@ int main(int argc, char** argv){
     }
 
     while (true){
-        mg_mgr_poll(&mgr, 10);
+        mg_mgr_poll(&mgr, 1);
     }
 
     mg_mgr_free(&mgr);
