@@ -149,6 +149,9 @@ char** dir_list(const char* path) {
             if (entry == NULL) {
                 break;
             } else {
+                if ((strcmp(entry->d_name, ".") == 0) || (strcmp(entry->d_name, "..") == 0)) {
+                    continue;
+                }
                 char** tmp = realloc(list, sizeof(char*) * (count + 2));
                 if (tmp == NULL) {
                     closedir(d);
@@ -204,4 +207,3 @@ bool dir_exists(const char* path) {
         }
     }
 }
-

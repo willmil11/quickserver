@@ -41,7 +41,7 @@ typedef struct {
     bool free_authorized;
 } reqResp;
 
-char* default_404_page = "<!DOCTYPE html>\n<html>\n    <head>\n        <title>404 – Page not found</title>\n    </head>\n    <body>\n        <iframe id=\"homepage\"></iframe>\n        <div id=\"container\">\n            <center>\n                <h1 id=\"header\">404 – Page not found</h1>\n                <button id=\"button\">Go to homepage</button>\n            </center>\n        </div>\n    </body>\n</html>\n<script>\n    ;(function(){\n        var container = document.getElementById(\"container\");\n        var header = document.getElementById(\"header\");\n        var button = document.getElementById(\"button\");\n        var homepage = document.getElementById(\"homepage\");\n\n        var original_homepage_dsp = homepage.style.display;\n        homepage.style.display = \"none\";\n        \n        var homepage_loaded = false;\n        homepage.onload = function(){\n            homepage_loaded = true;\n        }\n\n        document.body.style.backgroundColor = \"#f0eee6\";\n        document.body.style.margin = \"0px\";\n\n        document.body.style.userSelect = \"none\";\n        document.body.style.webkitUserSelect = \"none\";\n        document.body.style.mozUserSelect = \"none\";\n        document.body.style.msUserSelect = \"none\";\n\n        container.style.backgroundColor = \"#e3dacc\";\n        container.style.position = \"absolute\";\n        \n        header.style.fontFamily = \"Arial\";\n        button.style.backgroundColor = \"rgb(40,40,40)\";\n        button.style.color = \"rgb(255,255,255)\";\n        button.style.fontFamily = \"Arial\";\n        button.style.border = \"0px\"\n\n        button.onmouseover = function(){\n            button.style.backgroundColor = \"#bcb6ff\";\n            button.style.color = \"rgb(0,0,0)\";\n        }\n        button.onmouseout = function(){\n            button.style.backgroundColor = \"rgb(40,40,40)\";\n            button.style.color = \"rgb(255,255,255)\";\n        }\n\n        window.onresize = function(){\n            var sizeFactor = window.innerWidth * window.innerHeight / 10000;\n\n            header.style.fontSize = sizeFactor / 2 + \"px\";\n            container.style.borderRadius = sizeFactor / 16 + \"px\";\n\n            try{\n                button.style.fontSize = sizeFactor / 3 + \"px\";\n                button.style.borderRadius = sizeFactor / 16 + \"px\";\n            }\n            catch (error){}\n\n            container.style.padding = sizeFactor / 16 + \"px\"\n\n            container.style.marginLeft = window.innerWidth / 2 - container.offsetWidth / 2 + \"px\";\n            container.style.marginTop = window.innerHeight / 2 - container.offsetHeight / 2 + \"px\";\n        }\n        window.onresize();\n\n        var wait = async function(ms){\n            return new Promise(function(resolve, reject){\n                setTimeout(resolve, ms);\n            })\n        }\n\n        button.onclick = async function(){\n            homepage.src = \"/\"\n\n            button.remove();\n            header.innerHTML = \"Loading...\";\n\n            window.onresize();\n\n            while (!homepage_loaded){\n                await wait(10); //wait till page is loaded.\n            }\n\n            homepage.style.display = original_homepage_dsp;\n\n            homepage.style.border = \"0px\";\n            homepage.style.position = \"absolute\";\n            container.remove();\n            window.onresize = function(){\n                homepage.style.width = window.innerWidth + \"px\";\n                homepage.style.height = window.innerHeight + \"px\";\n            }\n            window.onresize();\n        }\n    })();\n</script>\n\n";
+char* default_404_page = "<!DOCTYPE html>\n<html>\n    <head>\n        <title>404 – Page not found</title>\n    </head>\n    <body>\n        <iframe id=\"homepage\"></iframe>\n        <div id=\"container\">\n            <center>\n                <h1 id=\"header\">404 – Page not found</h1>\n                <button id=\"button\">Go to homepage</button>\n            </center>\n        </div>\n    </body>\n</html>\n<script>\n    ;(function(){\n        var container = document.getElementById(\"container\");\n        var header = document.getElementById(\"header\");\n        var button = document.getElementById(\"button\");\n        var homepage = document.getElementById(\"homepage\");\n        homepage.style.backgroundColor = \"white\";\n        var original_homepage_dsp = homepage.style.display;\n        homepage.style.display = \"none\";\n        \n        var homepage_loaded = false;\n        homepage.onload = function(){\n            homepage_loaded = true;\n        }\n\n        document.body.style.backgroundColor = \"#f0eee6\";\n        document.body.style.margin = \"0px\";\n\n        document.body.style.userSelect = \"none\";\n        document.body.style.webkitUserSelect = \"none\";\n        document.body.style.mozUserSelect = \"none\";\n        document.body.style.msUserSelect = \"none\";\n\n        container.style.backgroundColor = \"#e3dacc\";\n        container.style.position = \"absolute\";\n        \n        header.style.fontFamily = \"Arial\";\n        button.style.backgroundColor = \"rgb(40,40,40)\";\n        button.style.color = \"rgb(255,255,255)\";\n        button.style.fontFamily = \"Arial\";\n        button.style.border = \"0px\"\n\n        button.onmouseover = function(){\n            button.style.backgroundColor = \"#bcb6ff\";\n            button.style.color = \"rgb(0,0,0)\";\n        }\n        button.onmouseout = function(){\n            button.style.backgroundColor = \"rgb(40,40,40)\";\n            button.style.color = \"rgb(255,255,255)\";\n        }\n\n        window.onresize = function(){\n            var sizeFactor = window.innerWidth * window.innerHeight / 10000;\n\n            header.style.fontSize = sizeFactor / 2 + \"px\";\n            container.style.borderRadius = sizeFactor / 16 + \"px\";\n\n            try{\n                button.style.fontSize = sizeFactor / 3 + \"px\";\n                button.style.borderRadius = sizeFactor / 16 + \"px\";\n            }\n            catch (error){}\n\n            container.style.padding = sizeFactor / 16 + \"px\"\n\n            container.style.marginLeft = window.innerWidth / 2 - container.offsetWidth / 2 + \"px\";\n            container.style.marginTop = window.innerHeight / 2 - container.offsetHeight / 2 + \"px\";\n        }\n        window.onresize();\n\n        var wait = async function(ms){\n            return new Promise(function(resolve, reject){\n                setTimeout(resolve, ms);\n            })\n        }\n\n        button.onclick = async function(){\n            homepage.src = \"/\"\n\n            button.remove();\n            header.innerHTML = \"Loading...\";\n\n            window.onresize();\n\n            while (!homepage_loaded){\n                await wait(10); //wait till page is loaded.\n            }\n\n            homepage.style.display = original_homepage_dsp;\n\n            homepage.style.border = \"0px\";\n            homepage.style.position = \"absolute\";\n            container.remove();\n            window.onresize = function(){\n                homepage.style.width = window.innerWidth + \"px\";\n                homepage.style.height = window.innerHeight + \"px\";\n            }\n            window.onresize();\n        }\n    })();\n</script>\n\n";
 
 char* serve_path = NULL;
 char* log_path = NULL;
@@ -521,7 +521,10 @@ reqResp handle_request(reqData req){
             dot_index++;
         }
         ext += dot_index; //Now ext is either en empty string or the extension of the file
-        printf("[Quickserver] [%s] File extension: '%s'.\n", processid, ext);
+        if (*ext == '.'){
+            ext++;
+        }
+        printf("[Quickserver] [%s] File extension: '.%s'.\n", processid, ext);
         printf("[Quickserver] [%s] Guessing MIME type...\n", processid);
 
         char* mime = get_mime_for_ext(ext);
@@ -560,6 +563,7 @@ reqResp handle_request(reqData req){
             log(req, resp, processid);
             freeProcessId(processid);
             free(full_path);
+            free(full_path_resolved);
             return resp;
         }
         sprintf(full_path_resolved, "%s/index.html", full_path);
@@ -578,6 +582,7 @@ reqResp handle_request(reqData req){
                 log(req, resp, processid);
                 freeProcessId(processid);
                 free(full_path);
+                free(full_path_resolved);
                 return resp;
             }
 
@@ -590,6 +595,8 @@ reqResp handle_request(reqData req){
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
             log(req, resp, processid);
             freeProcessId(processid);
+            free(full_path);
+            free(full_path_resolved);
             return resp;
         }
         else{
@@ -605,10 +612,11 @@ reqResp handle_request(reqData req){
                 log(req, resp, processid);
                 freeProcessId(processid);
                 free(full_path);
+                free(full_path_resolved);
                 return resp;
             }
             printf("[Quickserver] [%s] Listed directory, generating response...\n", processid);
-            size_t directory_list_response_len = strlen("List of items in :\n") + strlen(req.url) + 1;
+            size_t directory_list_response_len = strlen("List of items in '':\n") + strlen(req.url) + 1;
             char* directory_list_response = malloc(directory_list_response_len);
             if (!directory_list_response){
                 printf("[Quickserver] [%s] Failed to allocate memory to generate response, sending 500 (internal server error)...\n", processid);
@@ -620,10 +628,11 @@ reqResp handle_request(reqData req){
                 log(req, resp, processid);
                 freeProcessId(processid);
                 free(full_path);
+                free(full_path_resolved);
                 dir_list_free(directory_list);
                 return resp;
             }
-            sprintf(directory_list_response, "List of items in %s:\n", req.url);
+            sprintf(directory_list_response, "List of items in '%s':\n", req.url);
             
             for (int index = 0; directory_list[index] != NULL; index++){
                 directory_list_response_len = directory_list_response_len + strlen("  - \n") + strlen(directory_list[index]);
@@ -640,6 +649,7 @@ reqResp handle_request(reqData req){
                     free(directory_list_response);
                     dir_list_free(directory_list);
                     free(full_path);
+                    free(full_path_resolved);
                     return resp;
                 }
                 directory_list_response = tmp;
@@ -654,10 +664,13 @@ reqResp handle_request(reqData req){
             resp.http_code = 200;
             resp.free_authorized = true;
             resp.resp_data = directory_list_response;
-            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", directory_list_response_len - 1);
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", directory_list_response_len - 2);
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
             log(req, resp, processid);
             freeProcessId(processid);
+            free(full_path);
+            free(full_path_resolved);
+            dir_list_free(directory_list);
             return resp;
         }
     }
@@ -1226,19 +1239,11 @@ int main(int argc, char** argv){
         }
         g_https_enabled = true;
     }
+    else{
+        g_https_enabled = false;
+    }
 
     while (true){
         mg_mgr_poll(&mgr, 1);
     }
-
-    mg_mgr_free(&mgr);
-    if (g_tls_cert_data){
-        free(g_tls_cert_data);
-        g_tls_cert_data = NULL;
-    }
-    if (g_tls_key_data){
-        free(g_tls_key_data);
-        g_tls_key_data = NULL;
-    }
-    g_https_enabled = false;
 }
