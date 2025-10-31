@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "libs/cJSON.h"
 #include "libs/cJSON.c"
@@ -277,6 +278,7 @@ char* newProcessID(){
 }
 
 bool freeProcessId(char* processid){
+    printf("[Quickserver] [%s] Freeing processid...\n", processid);
     int indexOfProcessid = index_of_processid(processid);
     if (indexOfProcessid == -1){
         return false;
@@ -395,6 +397,17 @@ bool put_to_log(reqData log_data, reqResp resp, char* processid){
 }
 
 reqResp handle_request(reqData req){
+    if (strncmp(req.ip, "::ffff:", strlen("::ffff:")) == 0){
+        req.ip_type = true;
+        int ip_len = strlen(req.ip);
+        char newip[ip_len - strlen("::ffff:") + 1];
+        for (int index = strlen("::ffff:"); index < ip_len; index++){
+            newip[index - strlen("::ffff:")] = req.ip[index];
+        }
+        newip[ip_len - strlen("::ffff:")] = '\0';
+        strcpy(req.ip, newip);
+    }
+
     reqResp resp = {0};
     printf("[Quickserver] New request received, generating processid...\n");
     char* processid = newProcessID();
@@ -798,31 +811,27 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 int main(int argc, char** argv){
+    printf("[Quickserver] Quickserver by willmil11 (v1.0 - 10/30/2025 [mm/dd/yyyy]).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
-            printf("[Quickserver] [Help] Hello, this is a simple guide on how to use this software:\n");
-            printf("[Quickserver] [Help] This is a webserver software that handles both http and https, this means that you can use it to make a webserver that serves files in a simple non encrypted way as well as a secure, encrypted way. The first requires just the first three arguments while the latter requires all the fifth arguments.\n");
-            printf("[Quickserver] [Help] To use this software, you have to execute it with a few arguments:\n");
-            printf("[Quickserver] [Help]     - The first argument is the path to the content you wish to serve to the user that connects to this webserver, it must be a valid path to a folder, inside it 'index.html' is the default file that will be served to the user if they don't specify a path (e.g. example.com), although if 'index.html' does not exist, a default page built into the software will be served. And if they do specify a path, and if that path is a file (e.g. example.com/coolpicture.png) it will be served simply, although if it is a directory (example.com/mywebsite), the webserver will search for 'index.html' in that directory and if it does not exist will provide the list of files in the directory as plain text. The webserver will always try to set the correct 'Content-Type' response header on the response based on the file's extension. If the path requested by the client does not exist in the path specified in the first argument, the webserver will search for '404.html' in the path specified in the first argument and serve it, if it does not exist a default page built into this software will be served instead.\n");
-            printf("[Quickserver] [Help]     - The second argument is the path to the log directory, it is a directory where the webserver will write logs for every request named following the format 'month-day-year_hour:minute:second:millisecond.json'. The logs contain the client's ip, their request's headers, body, url and method formatted as a json object for easier automatic parsing, if it is not easy on the eyes which I can totally understand, simply run 'quickserver analyse-log /path/to/log' to get a more readable view.\n");
-            printf("[Quickserver] [Help]     - The third argument is the port to serve the content on, it is a number between 1 and 65535 that you have to choose, you cannot run two (or more) softwares on a single port and some ports are privileged, the default ports browsers use for http and https are 80 and 443 respectively, please note that at least on linux those are privileged ports, you will therefore need to run the software as superuser, but for testing or other use cases that only require high ports such as 8080 you can just run the software with your users without any issues (if the port is not already used).\n");
-            printf("[Quickserver] [Help]     - The fourth argument is the path to the pem file, providing it along with the fifth argument (the key file) that I am gonna talk about right after this one will turn on the https mode of the server. Those files are required to use https on a webserver. They are given by your certificate provider, there are some free ones like let's encrypt which you can use.\n");
-            printf("[Quickserver] [Help]     - The fifth argument is the path to the key file, providing it along with the fourth argument (the pem file) that I just talked about right before this one will turn on the https mode of the server. Those files are required to use https on a webserver. They are given by your certificate eprovider, there are some free ones like let's encrypt which you can use.\n");
-            printf("[Quickserver] [Help] Example of usage:\n");
-            printf("[Quickserver] [Help] Say you have this file structure:\n");
-            printf("[Quickserver] [Help] server\n");
-            printf("[Quickserver] [Help]   -> index.html\n");
-            printf("[Quickserver] [Help]   -> news\n");
-            printf("[Quickserver] [Help]        -> index.html\n");
-            printf("[Quickserver] [Help]        -> fish.png\n");
-            printf("[Quickserver] [Help] logs\n");
-            printf("[Quickserver] [Help] server.pem\n");
-            printf("[Quickserver] [Help] server.key\n");
-            printf("[Quickserver] [Help] Here you could start a webserver using the command:\n");
-            printf("[Quickserver] [Help] quickserver server/ logs/ 443 server.pem server.key\n");
-            printf("[Quickserver] [Help] This would start an https webserver on port 443 (if you have sufficient privileges, serving the content in server and storing the logs in logs. Say the server is accessible at 'example.com', accessing 'example.com' would serve file 'index.html', accessing 'example.com/news' would serve file 'index.html' in 'news', accessing 'example.com/news/fish.png' would serve file 'fish.png' in news and accessing 'example.com/cat' would serve the default '404.html' embedded in this software as no '404.html' is present in the directory to serve.\n");
-            printf("[Quickserver] [Help] If you need additional help that isn't here, you can contact me by email: willmil111012@gmail.com, or preferably by discord (willmil11).\n");
+            printf("[Quickserver] [Help] Hello, this is a guide on how do use this software which is a webserver written by me willmil11, in C:\n");
+            printf("[Quickserver] [Help] Unless you installed it through an automatic stript that did it for you, you need to move it to somewhere in your PATH like '/usr/bin' on linux so you can use it easily.\n");
+            printf("[Quickserver] [Help] \n");
+            printf("[Quickserver] [Help] Here are the ways to use it:\n");
+            printf("[Quickserver] [Help]   - quickserver help\n");
+            printf("[Quickserver] [Help]   - quickserver analyse-log /path/to/log.json\n");
+            printf("[Quickserver] [Help]   - quickserver /path/to/serve/ /path/to/logs/ port [/path/to/pem] [/path/to/key]\n");
+            printf("[Quickserver] [Help] \n");
+            printf("[Quickserver] [Help] The first one, it displays the message you can see here, the second one is to display the information of a log file in a human readable way, and the third one is to start the webserver, if you want it to be http do not specify the last two arguments, however if you want it to be https, please do.\n");
+            printf("[Quickserver] [Help] \n");
+            printf("[Quickserver] [Help] The argument for the second one is the path to the log file which are named like 'month-day-year_hour:minute:second:millisecond'.\n");
+            printf("[Quickserver] [Help] The arguments for the third one are firstly, the path to a valid directory containing the content to serve, secondly the path to a valid directory where the logs will be written, thirdly the port to serve on, thirdly and fourth (optional if you want https instead of http) the path to the pem file and key file respectively.\n");
+            printf("[Quickserver] [Help] \n");
+            printf("[Quickserver] [Help] Also please note that you may need to run with higher privileges (sudo/run as administrator/other things depending on os) the webserver if you're running on privileged ports.\n");
+            printf("[Quickserver] [Help] \n");
+            printf("[Quickserver] [Help] If you need any more help, you can contact me with my email (willmil111012@gmail.com) or my discord (willmil11).\n");
+            printf("[Quickserver] [Help] Good luck and have a good day :)\n");
             return 0;
         }
         else{
@@ -1224,10 +1233,11 @@ int main(int argc, char** argv){
     if (https_enabled){
         // Enable TLS
         struct mg_tls_opts opts = {
-            .cert = mg_str(g_tls_cert_data),
-            .key = mg_str(g_tls_key_data),
+            .cert = mg_str(g_tls_cert_data),   // PEM may include full chain
+            .key  = mg_str(g_tls_key_data),
         };
         mg_tls_init(lsn, &opts);
+
         if (lsn->tls == NULL || !lsn->is_tls) {
             printf("[Quickserver] Failed to init tls. Common reasons include: invalid pem, invalid key...\n");
             mg_mgr_free(&mgr);
