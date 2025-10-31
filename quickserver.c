@@ -38,7 +38,7 @@ typedef struct {
 typedef struct {
     char* resp_data;
     int http_code;
-    char resp_headers[256];
+    char resp_headers[4096];
     bool free_authorized;
 } reqResp;
 
@@ -435,6 +435,68 @@ reqResp handle_request(reqData req){
     }
 
     //Resolve path
+    printf("[Quickserver] [%s] Checking for query string...\n", processid);
+    char* query_string = NULL;
+    int url_len = strlen(req.url);
+    for (int index = 0; index < url_len; index++){
+        if (req.url[index] == '?'){
+            req.url[index] = '\0';
+            query_string = req.url + index + 1;
+            break;
+        }
+    }
+
+    int query_string_len = -1;
+
+    if (!query_string){
+        printf("[Quickserver] [%s] No query string found.\n", processid);
+    }
+    else{
+        query_string_len = strlen(query_string);
+        char* url_fixed = realloc(req.url, url_len + query_string_len + 2);
+        if (!url_fixed){
+            printf("[Quickserver] [%s] Failed to allocate memory to handle query string.\n", processid);
+            printf("[Quickserver] [%s] Sending 500 (internal server error)...\n", processid);
+            resp.http_code = 500;
+            resp.free_authorized = false;
+            resp.resp_data = "Internal server error.";
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            return resp;
+        }
+        req.url = url_fixed;
+
+        for (int index = query_string_len; index >= 0; index--){
+            query_string[index + 1] = query_string[index];
+        }
+        query_string[0] = '?';
+
+        char* tmp = strdup(query_string);
+        if (!tmp){
+            printf("[Quickserver] [%s] Failed to allocate memory to handle query string.\n", processid);
+            printf("[Quickserver] [%s] Sending 500 (internal server error)...\n", processid);
+            resp.http_code = 500;
+            resp.free_authorized = false;
+            resp.resp_data = "Internal server error.";
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+            log(req, resp, processid);
+            freeProcessId(processid);
+            return resp;
+        }
+        query_string = tmp;
+
+        printf("[Quickserver] [%s] Found query string.\n", processid);
+        printf("[Quickserver] [%s] New url: '%s'\n", processid, req.url);
+        printf("[Quickserver] [%s] Query string: '%s'\n", processid, query_string);
+    }
+    url_len = strlen(req.url);
+    if (query_string){
+        query_string_len = strlen(query_string);
+    }
+
     int serve_path_len = strlen(serve_path);
     char serve_path_no_leading_slash[serve_path_len + 1];
     strcpy(serve_path_no_leading_slash, serve_path);
@@ -587,7 +649,6 @@ reqResp handle_request(reqData req){
         }
         sprintf(full_path_resolved, "%s/index.html", full_path);
         if (is_file(full_path_resolved)){
-            int url_len = strlen(req.url);
             if (req.url[url_len - 1] != '/'){
                 printf("[Quickserver] [%s] The directory the request url points to contains an 'index.html' file, but the request url doesn't end with a leading slash, redirecting user...\n", processid);
                 char* newurl = realloc(req.url, url_len + 2);
@@ -611,7 +672,13 @@ reqResp handle_request(reqData req){
                 resp.http_code = 307;
                 resp.free_authorized = false;
                 resp.resp_data = "";
-                sprintf(resp.resp_headers, "Location: %s\r\nContent-Length: 0\r\nConnection: close", req.url);
+
+                if (query_string){
+                    sprintf(resp.resp_headers, "Location: %s%s\r\nContent-Length: 0\r\nConnection: close", req.url, query_string);
+                }
+                else{
+                    sprintf(resp.resp_headers, "Location: %s\r\nContent-Length: 0\r\nConnection: close", req.url);
+                }
                 printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
                 log(req, resp, processid);
                 freeProcessId(processid);
@@ -849,7 +916,7 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 int main(int argc, char** argv){
-    printf("[Quickserver] Quickserver by willmil11 (v1.0.1 - 10/31/2025 [mm/dd/yyyy]).\n");
+    printf("[Quickserver] Quickserver by willmil11 (v1.1.1 - 10/31/2025 [mm/dd/yyyy]).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
