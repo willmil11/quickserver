@@ -811,7 +811,7 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 int main(int argc, char** argv){
-    printf("[Quickserver] Quickserver by willmil11 (v1.0 - 10/30/2025 [mm/dd/yyyy]).\n");
+    printf("[Quickserver] Quickserver by willmil11 (v1.0 - 10/31/2025 [mm/dd/yyyy]).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
@@ -826,9 +826,9 @@ int main(int argc, char** argv){
             printf("[Quickserver] [Help] The first one, it displays the message you can see here, the second one is to display the information of a log file in a human readable way, and the third one is to start the webserver, if you want it to be http do not specify the last two arguments, however if you want it to be https, please do.\n");
             printf("[Quickserver] [Help] \n");
             printf("[Quickserver] [Help] The argument for the second one is the path to the log file which are named like 'month-day-year_hour:minute:second:millisecond'.\n");
-            printf("[Quickserver] [Help] The arguments for the third one are firstly, the path to a valid directory containing the content to serve, secondly the path to a valid directory where the logs will be written, thirdly the port to serve on, thirdly and fourth (optional if you want https instead of http) the path to the pem file and key file respectively.\n");
+            printf("[Quickserver] [Help] The arguments for the third one are firstly, the path to a valid directory containing the content to serve (if a custom 404.html is not specified in this directory the default page embedded into the software will be used, when acessing a directory if it does not contain an index.html, the webserver will respond with a plain text list of the directory's items), secondly the path to a valid directory where the logs will be written, thirdly the port to serve on, thirdly and fourth (optional if you want https instead of http) the path to the pem file and key file respectively.\n");
             printf("[Quickserver] [Help] \n");
-            printf("[Quickserver] [Help] Also please note that you may need to run with higher privileges (sudo/run as administrator/other things depending on os) the webserver if you're running on privileged ports.\n");
+            printf("[Quickserver] [Help] Also please note that on linux/macos you may need to run with higher privilege the webserver (sudo) if you're running on privileged ports (<1024).\n");
             printf("[Quickserver] [Help] \n");
             printf("[Quickserver] [Help] If you need any more help, you can contact me with my email (willmil111012@gmail.com) or my discord (willmil11).\n");
             printf("[Quickserver] [Help] Good luck and have a good day :)\n");
