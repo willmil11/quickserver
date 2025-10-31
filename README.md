@@ -26,7 +26,3 @@ Then just move it into your path so you can easily call it with 'quickserver' or
 
 ## License
 Link to license (<a href="./LICENSE.md">click here</a>)
-```
-```
-```
-```
