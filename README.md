@@ -1,6 +1,6 @@
 # Quickserver v1.0
 ## What is this?
-This is a webserver that I made in C, it allows for ipv6, ipv4, https, and http.
+This is a webserver that I made in C, it supports ipv6, ipv4, https, and http.
 
 ## How do I use this?
 So first unless you've got my exact device (rasberry pi 4) you'll need to compile the file, which is easy as there are no dependencies to pull or whatever just one script which is basically one command, so open your shell (and make sure you have gcc installed) then run:
