@@ -453,8 +453,8 @@ reqResp handle_request(reqData req){
     }
     else{
         query_string_len = strlen(query_string);
-        char* url_fixed = realloc(req.url, url_len + query_string_len + 2);
-        if (!url_fixed){
+        char* query_string_build = malloc(query_string_len + 2);
+        if (!query_string_build){
             printf("[Quickserver] [%s] Failed to allocate memory to handle query string.\n", processid);
             printf("[Quickserver] [%s] Sending 500 (internal server error)...\n", processid);
             resp.http_code = 500;
@@ -466,36 +466,23 @@ reqResp handle_request(reqData req){
             freeProcessId(processid);
             return resp;
         }
-        req.url = url_fixed;
+        strcpy(query_string_build, query_string);
 
         for (int index = query_string_len; index >= 0; index--){
-            query_string[index + 1] = query_string[index];
+            query_string_build[index + 1] = query_string_build[index];
         }
-        query_string[0] = '?';
-
-        char* tmp = strdup(query_string);
-        if (!tmp){
-            printf("[Quickserver] [%s] Failed to allocate memory to handle query string.\n", processid);
-            printf("[Quickserver] [%s] Sending 500 (internal server error)...\n", processid);
-            resp.http_code = 500;
-            resp.free_authorized = false;
-            resp.resp_data = "Internal server error.";
-            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
-            printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
-            freeProcessId(processid);
-            return resp;
-        }
-        query_string = tmp;
+        query_string_build[0] = '?';
+        query_string_build[query_string_len + 1] = '\0';
+        query_string = query_string_build;
 
         printf("[Quickserver] [%s] Found query string.\n", processid);
         printf("[Quickserver] [%s] New url: '%s'\n", processid, req.url);
         printf("[Quickserver] [%s] Query string: '%s'\n", processid, query_string);
     }
-    url_len = strlen(req.url);
     if (query_string){
         query_string_len = strlen(query_string);
     }
+    url_len = strlen(req.url);
 
     int serve_path_len = strlen(serve_path);
     char serve_path_no_leading_slash[serve_path_len + 1];
@@ -516,6 +503,9 @@ reqResp handle_request(reqData req){
         printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
         log(req, resp, processid);
         freeProcessId(processid);
+        if (query_string){
+            free(query_string);
+        }
         return resp;
     }
     
@@ -544,6 +534,12 @@ reqResp handle_request(reqData req){
             log(req, resp, processid);
             freeProcessId(processid);
             free(full_path);
+            if (query_string){
+                free(query_string);
+            }
+            if (user_404_page){
+                free(user_404_page);
+            }
             return resp;
         }
         else{
@@ -556,6 +552,9 @@ reqResp handle_request(reqData req){
             log(req, resp, processid);
             freeProcessId(processid);
             free(full_path);
+            if (query_string){
+                free(query_string);
+            }
             return resp;
         }
     }
@@ -578,6 +577,12 @@ reqResp handle_request(reqData req){
             log(req, resp, processid);
             freeProcessId(processid);
             free(full_path);
+            if (query_string){
+                free(query_string);
+            }
+            if (file){
+                free(file);
+            }
             return resp;
         }
         printf("[Quickserver] [%s] Read file. (%zu bytes)\n", processid, file_size_);
@@ -620,6 +625,9 @@ reqResp handle_request(reqData req){
         log(req, resp, processid);
         freeProcessId(processid);
         free(full_path);
+        if (query_string){
+            free(query_string);
+        }
         return resp;
     }
     else{
@@ -645,6 +653,9 @@ reqResp handle_request(reqData req){
             freeProcessId(processid);
             free(full_path);
             free(full_path_resolved);
+            if (query_string){
+                free(query_string);
+            }
             return resp;
         }
         sprintf(full_path_resolved, "%s/index.html", full_path);
@@ -663,6 +674,9 @@ reqResp handle_request(reqData req){
                     freeProcessId(processid);
                     free(full_path);
                     free(full_path_resolved);
+                    if (query_string){
+                        free(query_string);
+                    }
                     return resp;
                 }
                 req.url = newurl;
@@ -684,6 +698,9 @@ reqResp handle_request(reqData req){
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
+                if (query_string){
+                    free(query_string);
+                }
                 return resp;
             }
             printf("[Quickserver] [%s] The directory the request url points to contains an 'index.html' file, reading it...\n", processid);
@@ -701,6 +718,12 @@ reqResp handle_request(reqData req){
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
+                if (query_string){
+                    free(query_string);
+                }
+                if (file){
+                    free(file);
+                }
                 return resp;
             }
 
@@ -715,6 +738,9 @@ reqResp handle_request(reqData req){
             freeProcessId(processid);
             free(full_path);
             free(full_path_resolved);
+            if (query_string){
+                free(query_string);
+            }
             return resp;
         }
         else{
@@ -731,6 +757,9 @@ reqResp handle_request(reqData req){
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
+                if (query_string){
+                    free(query_string);
+                }
                 return resp;
             }
             printf("[Quickserver] [%s] Listed directory, generating response...\n", processid);
@@ -748,6 +777,9 @@ reqResp handle_request(reqData req){
                 free(full_path);
                 free(full_path_resolved);
                 dir_list_free(directory_list);
+                if (query_string){
+                    free(query_string);
+                }
                 return resp;
             }
             sprintf(directory_list_response, "List of items in '%s':\n", req.url);
@@ -768,6 +800,9 @@ reqResp handle_request(reqData req){
                     dir_list_free(directory_list);
                     free(full_path);
                     free(full_path_resolved);
+                    if (query_string){
+                        free(query_string);
+                    }
                     return resp;
                 }
                 directory_list_response = tmp;
@@ -789,6 +824,9 @@ reqResp handle_request(reqData req){
             free(full_path);
             free(full_path_resolved);
             dir_list_free(directory_list);
+            if (query_string){
+                free(query_string);
+            }
             return resp;
         }
     }
@@ -916,7 +954,7 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 int main(int argc, char** argv){
-    printf("[Quickserver] Quickserver by willmil11 (v1.1.1 - 10/31/2025 [mm/dd/yyyy]).\n");
+    printf("[Quickserver] Quickserver by willmil11 (v1.1.2 - 10/31/2025 [mm/dd/yyyy]).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
