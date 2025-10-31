@@ -529,15 +529,21 @@ reqResp handle_request(reqData req){
         for (int index = 0; index < ext_len; index++){
             if (ext[index] == '.'){
                 dot_index = index;
-                break;
             }
-            dot_index++;
+        }
+        if (dot_index == -1){
+            dot_index = strlen(ext);
         }
         ext += dot_index; //Now ext is either en empty string or the extension of the file
         if (*ext == '.'){
             ext++;
         }
-        printf("[Quickserver] [%s] File extension: '.%s'.\n", processid, ext);
+        if (strlen(ext) != 0){
+            printf("[Quickserver] [%s] File extension: '.%s'.\n", processid, ext);
+        }
+        else{
+            printf("[Quickserver] [%s] File extension: ''.\n", processid);
+        }
         printf("[Quickserver] [%s] Guessing MIME type...\n", processid);
 
         char* mime = get_mime_for_ext(ext);
@@ -581,6 +587,38 @@ reqResp handle_request(reqData req){
         }
         sprintf(full_path_resolved, "%s/index.html", full_path);
         if (is_file(full_path_resolved)){
+            int url_len = strlen(req.url);
+            if (req.url[url_len - 1] != '/'){
+                printf("[Quickserver] [%s] The directory the request url points to contains an 'index.html' file, but the request url doesn't end with a leading slash, redirecting user...\n", processid);
+                char* newurl = realloc(req.url, url_len + 2);
+                if (!newurl){
+                    printf("[Quickserver] [%s] Failed to allocate memory to create redirect link, sending 500 (internal server error).\n", processid);
+                    resp.http_code = 500;
+                    resp.free_authorized = false;
+                    resp.resp_data = "Internal server error.";
+                    sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+                    printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+                    log(req, resp, processid);
+                    freeProcessId(processid);
+                    free(full_path);
+                    free(full_path_resolved);
+                    return resp;
+                }
+                req.url = newurl;
+                newurl[url_len + 1] = '\0';
+                newurl[url_len] = '/';
+                printf("[Quickserver] [%s] Created redirect link, sending 307 (Temporary Redirect).\n", processid);
+                resp.http_code = 307;
+                resp.free_authorized = false;
+                resp.resp_data = "";
+                sprintf(resp.resp_headers, "Location: %s\r\nContent-Length: 0\r\nConnection: close", req.url);
+                printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
+                log(req, resp, processid);
+                freeProcessId(processid);
+                free(full_path);
+                free(full_path_resolved);
+                return resp;
+            }
             printf("[Quickserver] [%s] The directory the request url points to contains an 'index.html' file, reading it...\n", processid);
             char* file = file_read(full_path_resolved);
             ssize_t file_size_ = file_size(full_path_resolved);
@@ -811,7 +849,7 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 int main(int argc, char** argv){
-    printf("[Quickserver] Quickserver by willmil11 (v1.0 - 10/31/2025 [mm/dd/yyyy]).\n");
+    printf("[Quickserver] Quickserver by willmil11 (v1.0.1 - 10/31/2025 [mm/dd/yyyy]).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
