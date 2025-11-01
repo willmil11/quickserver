@@ -1,4 +1,4 @@
-# Quickserver v1.1.3
+# Quickserver v1.1.4
 ## What is this?
 This is a webserver that I made in C, it supports ipv6, ipv4, https, and http.
 
@@ -21,6 +21,7 @@ Then just move it into your path so you can easily call it with 'quickserver' or
 - [ ] I know there must be memory leaks hiding, I'll find them and fix them.
 
 ## Version history:
+- v1.1.4 - Fixed another bug in the default 404.html page.
 - v1.1.3 - Fixed a bug in the default 404.html page.
 - v1.1.2 - Fixed memory leaks, and a double free.
 - v1.1.1 - Added correct query string handling.
