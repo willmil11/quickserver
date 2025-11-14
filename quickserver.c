@@ -336,7 +336,7 @@ void get_time_string(char* buf) {
 #endif
 
 #define log put_to_log
-bool put_to_log(reqData log_data, reqResp resp, char* processid){
+bool put_to_log(reqData log_data, reqResp resp, char* processid, char* query_string){
     printf("[Quickserver] [%s] Generating log...\n", processid);
     char time[32] = {0};
     get_time_string(time);
@@ -352,6 +352,12 @@ bool put_to_log(reqData log_data, reqResp resp, char* processid){
     cJSON_AddStringToObject(log, "client_ip", log_data.ip);
     cJSON_AddStringToObject(log, "request_method", log_data.method);
     cJSON_AddStringToObject(log, "request_url", log_data.url);
+    if (query_string){
+        cJSON_AddStringToObject(log, "request_query_string", query_string);
+    }
+    else{
+        cJSON_AddStringToObject(log, "request_query_string", "");
+    }
     if (log_data.body){
         cJSON_AddStringToObject(log, "request_body", log_data.body);
     }
@@ -429,7 +435,7 @@ reqResp handle_request(reqData req){
         resp.resp_data = "Method not allowed (use GET).";
         sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
         printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-        log(req, resp, processid);
+        log(req, resp, processid, NULL);
         freeProcessId(processid);
         return resp;
     }
@@ -462,7 +468,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = "Internal server error.";
             sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, NULL);
             freeProcessId(processid);
             return resp;
         }
@@ -501,7 +507,7 @@ reqResp handle_request(reqData req){
         resp.resp_data = "Internal server error.";
         sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
         printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-        log(req, resp, processid);
+        log(req, resp, processid, query_string);
         freeProcessId(processid);
         if (query_string){
             free(query_string);
@@ -531,7 +537,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = default_404_page;
             sprintf(resp.resp_headers, "Content-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(default_404_page));
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, query_string);
             freeProcessId(processid);
             free(full_path);
             if (query_string){
@@ -549,7 +555,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = user_404_page;
             sprintf(resp.resp_headers, "Content-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\nConnection: close", user_404_page_size);
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, query_string);
             freeProcessId(processid);
             free(full_path);
             if (query_string){
@@ -574,7 +580,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = "Internal server error.";
             sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, query_string);
             freeProcessId(processid);
             free(full_path);
             if (query_string){
@@ -622,7 +628,7 @@ reqResp handle_request(reqData req){
         resp.resp_data = file;
         sprintf(resp.resp_headers, "Content-Type: %s; charset=utf-8\r\nContent-Length: %zu\r\nConnection: close", mime, file_size_);
         printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-        log(req, resp, processid);
+        log(req, resp, processid, query_string);
         freeProcessId(processid);
         free(full_path);
         if (query_string){
@@ -649,7 +655,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = "Internal server error.";
             sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, query_string);
             freeProcessId(processid);
             free(full_path);
             free(full_path_resolved);
@@ -670,7 +676,7 @@ reqResp handle_request(reqData req){
                     resp.resp_data = "Internal server error.";
                     sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
                     printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-                    log(req, resp, processid);
+                    log(req, resp, processid, query_string);
                     freeProcessId(processid);
                     free(full_path);
                     free(full_path_resolved);
@@ -694,7 +700,7 @@ reqResp handle_request(reqData req){
                     sprintf(resp.resp_headers, "Location: %s\r\nContent-Length: 0\r\nConnection: close", req.url);
                 }
                 printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-                log(req, resp, processid);
+                log(req, resp, processid, query_string);
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
@@ -714,7 +720,7 @@ reqResp handle_request(reqData req){
                 resp.resp_data = "Internal server error.";
                 sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
                 printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-                log(req, resp, processid);
+                log(req, resp, processid, query_string);
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
@@ -734,7 +740,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = file;
             sprintf(resp.resp_headers, "Content-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\nConnection: close", file_size_);
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, query_string);
             freeProcessId(processid);
             free(full_path);
             free(full_path_resolved);
@@ -753,7 +759,7 @@ reqResp handle_request(reqData req){
                 resp.resp_data = "Internal server error.";
                 sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
                 printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-                log(req, resp, processid);
+                log(req, resp, processid, query_string);
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
@@ -772,7 +778,7 @@ reqResp handle_request(reqData req){
                 resp.resp_data = "Internal server error.";
                 sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
                 printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-                log(req, resp, processid);
+                log(req, resp, processid, query_string);
                 freeProcessId(processid);
                 free(full_path);
                 free(full_path_resolved);
@@ -794,7 +800,7 @@ reqResp handle_request(reqData req){
                     resp.resp_data = "Internal server error.";
                     sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
                     printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-                    log(req, resp, processid);
+                    log(req, resp, processid, query_string);
                     freeProcessId(processid);
                     free(directory_list_response);
                     dir_list_free(directory_list);
@@ -819,7 +825,7 @@ reqResp handle_request(reqData req){
             resp.resp_data = directory_list_response;
             sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", directory_list_response_len - 2);
             printf("[Quickserver] [%s] Request terminated, logging and serving content...\n", processid);
-            log(req, resp, processid);
+            log(req, resp, processid, query_string);
             freeProcessId(processid);
             free(full_path);
             free(full_path_resolved);
@@ -954,7 +960,7 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 int main(int argc, char** argv){
-    printf("[Quickserver] Quickserver by willmil11 (v1.1.4 - 11/01/2025 [mm/dd/yyyy]).\n");
+    printf("[Quickserver] Quickserver by willmil11 (v1.1.5 - 11/14/2025 [mm/dd/yyyy]).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
@@ -1027,12 +1033,13 @@ int main(int argc, char** argv){
             cJSON* request_method = cJSON_GetObjectItem(log, "request_method");
             cJSON* response_http_code = cJSON_GetObjectItem(log, "response_http_code");
             cJSON* response_headers = cJSON_GetObjectItem(log, "response_headers");
+            cJSON* request_query_string = cJSON_GetObjectItem(log, "request_query_string");
 
-            if ((client_ip == NULL) || (request_url == NULL) || (request_headers == NULL) || (request_body == NULL) || (request_method == NULL) || (response_http_code == NULL) || (response_headers == NULL)){
+            if ((client_ip == NULL) || (request_url == NULL) || (request_headers == NULL) || (request_body == NULL) || (request_method == NULL) || (response_http_code == NULL) || (response_headers == NULL) || (request_query_string == NULL)){
                 corrupt_log();
             }
 
-            if ((!cJSON_IsString(client_ip)) || (!cJSON_IsString(request_url)) || (!cJSON_IsString(request_headers)) || (!cJSON_IsString(request_body)) || (!cJSON_IsString(request_method)) || (!(cJSON_IsNumber(response_http_code)) || (!(cJSON_IsString(response_headers))))){
+            if ((!cJSON_IsString(client_ip)) || (!cJSON_IsString(request_url)) || (!cJSON_IsString(request_headers)) || (!cJSON_IsString(request_body)) || (!cJSON_IsString(request_method)) || (!(cJSON_IsNumber(response_http_code)) || (!(cJSON_IsString(response_headers))) || (!(cJSON_IsString(request_query_string))))){
                 corrupt_log();
             }
 
@@ -1043,6 +1050,7 @@ int main(int argc, char** argv){
             char* request_method_dat = strdup(request_method->valuestring);
             int response_http_code_dat = response_http_code->valueint;
             char* response_headers_dat = strdup(response_headers->valuestring);
+            char* request_query_string_dat = strdup(request_query_string->valuestring);
 
             if ((!client_ip_dat) || (!request_url_dat) || (!request_headers_dat) || (!request_body_dat) || (!request_method_dat) || (!response_headers_dat)){
                 printf("[Quickserver] Failed to allocate memory to analyse log.\n");
@@ -1253,6 +1261,7 @@ int main(int argc, char** argv){
             printf("Request data:\n");
             printf("  - Client's ip: %s\n", client_ip_dat);
             printf("  - Request url: '%s'\n", request_url_dat);
+            printf("  - Request query string: '%s'\n", request_query_string_dat);
             printf("  - Request method: '%s'\n", request_method_dat);
             printf("  - Request headers: '%s'\n", request_headers_dat);
             printf("  - Request body: '%s'\n", request_body_dat);
