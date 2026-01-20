@@ -17,6 +17,7 @@ Then just move it into your path so you can easily call it with 'quickserver' or
 
 ## Future updates:
 - [ ] Add file caching.
+- [x] Fix an https bug that makes it so it doesn't work with stupid software like curl and only with smart software like browsers.
 - [ ] I know there must be memory leaks hiding, I'll find them and fix them.
 
 ## Version history:
