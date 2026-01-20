@@ -14493,13 +14493,40 @@ void mg_tls_init(struct mg_connection *c, const struct mg_tls_opts *opts) {
     }
   }
   if (opts->cert.buf != NULL && opts->cert.buf[0] != '\0') {
-    X509 *cert = load_cert(opts->cert);
+    BIO *cert_bio = BIO_new_mem_buf(opts->cert.buf, (int) (long) opts->cert.len);
+    if (cert_bio == NULL) {
+      mg_error(c, "BIO err");
+      goto fail;
+    }
+
+    // Load and set the first certificate (leaf certificate)
+    X509 *cert = opts->cert.buf[0] == '-'
+                     ? PEM_read_bio_X509(cert_bio, NULL, NULL, NULL)
+                     : d2i_X509_bio(cert_bio, NULL);
     rc = cert == NULL ? 0 : SSL_use_certificate(tls->ssl, cert);
     X509_free(cert);
     if (cert == NULL || rc != 1) {
       mg_error(c, "CERT err %d", mg_tls_err(c, tls, rc));
+      BIO_free(cert_bio);
       goto fail;
     }
+
+    // For PEM format, load and add any additional certificates in the chain
+    if (opts->cert.buf[0] == '-') {
+      X509 *chain_cert;
+      while ((chain_cert = PEM_read_bio_X509(cert_bio, NULL, NULL, NULL)) != NULL) {
+        // Use SSL_CTX_add_extra_chain_cert for better compatibility
+        if (SSL_CTX_add_extra_chain_cert(tls->ctx, chain_cert) != 1) {
+          X509_free(chain_cert);
+          BIO_free(cert_bio);
+          mg_error(c, "Chain cert err");
+          goto fail;
+        }
+        // Note: SSL_CTX_add_extra_chain_cert takes ownership, so don't free chain_cert
+      }
+    }
+
+    BIO_free(cert_bio);
   }
   if (opts->key.buf != NULL && opts->key.buf[0] != '\0') {
     EVP_PKEY *key = load_key(opts->key);
