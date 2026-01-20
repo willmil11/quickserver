@@ -1,4 +1,4 @@
-# Quickserver v1.1.5
+# Quickserver v1.1.6
 ## What is this?
 This is a webserver that I made in C, it supports ipv6, ipv4, https, and http.
 
@@ -17,10 +17,11 @@ Then just move it into your path so you can easily call it with 'quickserver' or
 
 ## Future updates:
 - [ ] Add file caching.
-- [ ] Fix an https bug that makes it so it doesn't work with stupid software like curl and only with smart software like browsers.
+- [x] Fix an https bug that makes it so it doesn't work with stupid software like curl and only with smart software like browsers.
 - [ ] I know there must be memory leaks hiding, I'll find them and fix them.
 
 ## Version history:
+- v1.1.6 - Fixed HTTPS certificate chain bug that caused SSL errors with curl and other clients.
 - v1.1.5 - Added query string to log.
 - v1.1.4 - Fixed another bug in the default 404.html page.
 - v1.1.3 - Fixed a bug in the default 404.html page.
