@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <limits.h>
 
 #include "libs/cJSON.h"
 #include "libs/cJSON.c"
@@ -516,6 +517,30 @@ reqResp handle_request(reqData req){
     }
     
     sprintf(full_path, "%s%s", serve_path_no_leading_slash, req.url); //url starts with /
+
+    printf("[Quickserver] [%s] Checking for path backtrace attacks...\n", processid);
+    char resolved_full[PATH_MAX];
+    char resolved_serve[PATH_MAX];
+    if (realpath(serve_path_no_leading_slash, resolved_serve) != NULL &&
+        realpath(full_path, resolved_full) != NULL) {
+        size_t serve_len = strlen(resolved_serve);
+        if (strncmp(resolved_full, resolved_serve, serve_len) != 0 || (resolved_full[serve_len] != '/' && resolved_full[serve_len] != '\0')) {
+            printf("[Quickserver] [%s] Path backtrace attack detected (resolved '%s' is outside serve dir '%s').\n", processid, resolved_full, resolved_serve);
+            printf("[Quickserver] [%s] Sending 403 (forbidden).\n", processid);
+            resp.http_code = 403;
+            resp.free_authorized = false;
+            resp.resp_data = "We know what you're doing btw.";
+            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
+            log(req, resp, processid, query_string);
+            freeProcessId(processid);
+            free(full_path);
+            if (query_string){
+                free(query_string);
+            }
+            return resp;
+        }
+    }
+    printf("[Quickserver] [%s] No path backtrace attack found.\n", processid);
 
     bool resolve_type; //false is directory, true is file
     bool is_dir_ = is_dir(full_path);

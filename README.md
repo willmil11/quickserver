@@ -1,9 +1,9 @@
-# Quickserver v1.1.6
+# Quickserver v1.1.7
 ## What is this?
 This is a webserver that I made in C, it supports ipv6, ipv4, https, and http.
 
 ## How do I use this?
-So first unless you've got my exact device (rasberry pi 4) you'll need to compile the file, which is easy as there are no dependencies to pull or whatever just one script which is basically one command, so open your shell (and make sure you have gcc installed) then run:
+So first unless you've got my exact device (rasberry pi 4) (seriously don't do this it isn't even up to date) you'll need to compile the file, which is easy as there are no dependencies to pull or whatever just one script which is basically one command, so open your shell (and make sure you have gcc installed) then run:
 ```bash
 fish compile.fish
 ```
@@ -21,6 +21,7 @@ Then just move it into your path so you can easily call it with 'quickserver' or
 - [ ] I know there must be memory leaks hiding, I'll find them and fix them.
 
 ## Version history:
+- v1.1.7 - Fixed security vunerability (path backtracing attack).
 - v1.1.6 - Fixed HTTPS certificate chain bug that caused SSL errors with curl and other clients.
 - v1.1.5 - Added query string to log.
 - v1.1.4 - Fixed another bug in the default 404.html page.
