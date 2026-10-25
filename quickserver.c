@@ -526,26 +526,18 @@ reqResp handle_request(reqData req){
         size_t serve_len = strlen(resolved_serve);
         if (strncmp(resolved_full, resolved_serve, serve_len) != 0 || (resolved_full[serve_len] != '/' && resolved_full[serve_len] != '\0')) {
             printf("[Quickserver] [%s] Path backtrace attack detected (resolved '%s' is outside serve dir '%s').\n", processid, resolved_full, resolved_serve);
-            printf("[Quickserver] [%s] Sending 403 (forbidden).\n", processid);
-            resp.http_code = 403;
-            resp.free_authorized = false;
-            resp.resp_data = "We know what you're doing btw.";
-            sprintf(resp.resp_headers, "Content-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close", strlen(resp.resp_data));
-            log(req, resp, processid, query_string);
-            freeProcessId(processid);
-            free(full_path);
-            if (query_string){
-                free(query_string);
-            }
-            return resp;
+	    printf("[Quickserver] [%s] Executing 404 path...\n", processid);
+	    goto trigger_404;
+	    exit(1); //If goto doesn't work for some godforesaken reason, do NOT proceed.
         }
     }
-    printf("[Quickserver] [%s] No path backtrace attack found.\n", processid);
+    printf("[Quickserver] [%s] No path backtrace attack found (or it pointed to a non existant path and will be handled by 404 anyways).\n", processid);
 
     bool resolve_type; //false is directory, true is file
     bool is_dir_ = is_dir(full_path);
     bool is_file_ = is_file(full_path);
     if ((!is_dir_) && (!is_file_)){
+    trigger_404:
         printf("[Quickserver] [%s] Request url does not point to a valid file/directory, sending 404 (Not Found)...\n", processid);
         //404 case.
         //Attempt to fetch 404.html
@@ -588,6 +580,7 @@ reqResp handle_request(reqData req){
             }
             return resp;
         }
+	exit(1); //It is 3:04am and the paranoia is winning but ya know, the instruction pointer might just grow legs and decide to break the laws of logic
     }
     else{
         resolve_type = is_file_;
@@ -984,8 +977,13 @@ void qs_http_cb(struct mg_connection *c, int ev, void *ev_data) {
     }
 }
 
+void corrupt_log(){
+    printf("[Quickserver] Log file is corrupted.\n");
+    exit(1);
+}
+
 int main(int argc, char** argv){
-    printf("[Quickserver] Quickserver by willmil11 (v1.1.7 - 04/25/2026 [mm/dd/yyyy]).\n");
+    printf("[Quickserver] Quickserver by willmil11 (v1.1.8 - oct. 25 2026).\n");
     srand(time(NULL));
     if (argc == 2){
         if (strcmp(argv[1], "help") == 0){
@@ -1042,11 +1040,6 @@ int main(int argc, char** argv){
             }
             printf("[Quickserver] Parsed log.\n");
             free(content);
-
-            void corrupt_log(){
-                printf("[Quickserver] Log file is corrupted.\n");
-                exit(1);
-            }
 
             if (!cJSON_IsObject(log)){
                 corrupt_log();
