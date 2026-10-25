@@ -12,6 +12,7 @@ And if you don't have the fish shell, I think you can basically use whatever she
 bash compile.fish
 ```
 And it'll work :)
+<br>
 **Edit**: Not only does it work, but you don't have to worry about clang masquarading as gcc on macos or termux because this now also compiles with clang.
 
 Then just move it into your path so you can easily call it with 'quickserver' or you can just use it like './quickserver' then just do 'quickserver help' or './quickserver help' depending if it's in your path or not to have a little guide.
